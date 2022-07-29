@@ -12,7 +12,7 @@ def obter_matriz_nula(linhas, colunas):
 
 ## Parametros gerais
 
-tolerancia = 0.01
+tolerancia = 0.001
 potencia_complexa_base_MVA = 100
 tensoes_base_kV = [16.5, 18, 13.8, *([230] * 6)]
 
@@ -105,11 +105,12 @@ def soma(a, b):
     return a + b
 
 
+def inverte(a):
+    return 0 if a == 0 else 1 / a
+
+
 def calcular_matriz_admitancia(impedancia_serie, admitancia_shunt):
     matriz_admitancia = obter_matriz_nula(total_barras, total_barras)
-
-    def inverte(a):
-        return 0 if a == 0 else 1 / a
 
     for i in range(total_barras):
         for j in range(total_barras):
@@ -349,18 +350,21 @@ def subtrair_vetores(vetor1, vetor2):
     return resultado
 
 
+def norma_vetor(vetor):
+    norma = 0
+
+    for i in range(len(vetor)):
+        norma += vetor[i] ** 2
+
+    return math.sqrt(norma)
+
+
 def resultado_esta_bom(delta_pot):
-    esta_bom = True
-    erro_maximo = 0
+    erro = norma_vetor(delta_pot)
 
-    for i in range(len(delta_pot)):
-        if abs(delta_pot[i]) > erro_maximo:
-            erro_maximo = abs(delta_pot[i])
+    esta_bom = erro < tolerancia
 
-        if abs(delta_pot[i]) > tolerancia:
-            esta_bom = False
-
-    return esta_bom, erro_maximo
+    return esta_bom, erro
 
 
 def atualizar_fase_e_tensao(variacao_fase_e_tensao):
@@ -409,9 +413,10 @@ def calcular_fluxo_potencia(barra_1, barra_2):
     tensao_1 = cmath.rect(tensao[barra_1], fase[barra_1])
     tensao_2 = cmath.rect(tensao[barra_2], fase[barra_2])
 
-    corrente_12 = (tensao_1 - tensao_2) * (-1 * matriz_admitancia[barra_1][barra_2])
+    corrente_12 = (tensao_1 - tensao_2) * inverte(impedancia_serie[barra_1][barra_2])
+    corrente_12 += tensao_1 * admitancia_shunt[barra_1][barra_2]
 
-    fluxo_potencia_12 = np.conjugate(corrente_12) * tensao_1
+    fluxo_potencia_12 = tensao_1 * np.conjugate(corrente_12)
 
     return fluxo_potencia_12
 
