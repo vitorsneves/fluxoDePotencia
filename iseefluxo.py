@@ -2,23 +2,45 @@ from functools import reduce
 import numpy as np
 import math
 
-# Funções auxiliares
-
 
 def obter_matriz_nula(linhas, colunas):
     return [[0 for i in range(colunas)] for j in range(linhas)]
 
 
-def soma(a, b):
-    return a + b
-
-
 # Dados do problema
 
+## Parametros gerais
+
+tolerancia = 0.001
+
+## Dados das barras
+
+### Quantidade
 total_barras = 9
 barras_PV = 2
 barras_PQ = 6
-tolerancia = 0.001
+
+### Tensões e fases iniciais supostas
+tensao = [1.04, 1.025, 1.025, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
+fase = [0] * (total_barras)
+
+potencias_esperadas = [
+    1.63,
+    0.85,
+    0.00,
+    -1.25,
+    -0.90,
+    0.00,
+    -1.00,
+    0.00,
+    0.00,
+    -0.50,
+    -0.30,
+    0.00,
+    -0.35,
+    0.00,
+]
+
 
 ## Dados de linhas e transformadores
 impedancia_serie = obter_matriz_nula(total_barras, total_barras)
@@ -73,6 +95,13 @@ admitancia_shunt[7][8] = 0.2090j
 admitancia_shunt[8][7] = 0.2090j
 
 
+# Fim dos dados do problema
+
+
+def soma(a, b):
+    return a + b
+
+
 def calcular_matriz_admitancia(impedancia_serie, admitancia_shunt):
     matriz_admitancia = obter_matriz_nula(total_barras, total_barras)
 
@@ -99,9 +128,8 @@ def calcular_matriz_admitancia(impedancia_serie, admitancia_shunt):
     return matriz_admitancia
 
 
+# Calculo da matriz admitancia
 matriz_admitancia = calcular_matriz_admitancia(impedancia_serie, admitancia_shunt)
-tensao = [1.04, 1.025, 1.025, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
-fase = [0] * (total_barras)
 
 
 def calcular_potencia_ativa(num_barra):
@@ -290,7 +318,7 @@ def obter_potencias_calculadas():
 
     # Cálculo de potências reativas
     # A barra slack e as barras pv foram desconsideradas
-    for i in range(3, total_barras):
+    for i in range(barras_PV + 1, total_barras):
         potencias_calculadas[posicao_atual] = calcular_potencia_reativa(i)
         posicao_atual += 1
 
@@ -317,22 +345,24 @@ def resultado_esta_bom(delta_pot):
     return resultado_bom
 
 
-potencias_esperadas = [
-    1.63,
-    0.85,
-    0.00,
-    -1.25,
-    -0.90,
-    0.00,
-    -1.00,
-    0.00,
-    0.00,
-    -0.50,
-    -0.30,
-    0.00,
-    -0.35,
-    0.00,
-]
+def atualizar_fase_e_tensao(variacao_fase_e_tensao):
+
+    # Atualização da fase
+    for i in range(total_barras - 1):
+        fase[i] += variacao_fase_e_tensao[i]
+
+    # Atualização tensão
+    # Começa na primeira tensão de barra PQ
+    # Pula a slack e as barras PV
+    posicao_tensao = barras_PV + 1
+
+    for i in range(total_barras, len(variacao_fase_e_tensao)):
+        tensao[posicao_tensao] = (-1 * tensao[posicao_tensao]) / (
+            variacao_fase_e_tensao[i] - 1
+        )
+
+        posicao_tensao += 1
+
 
 while True:
     potencias_calculadas = obter_potencias_calculadas()
@@ -345,7 +375,9 @@ while True:
 
     jacobiano_inverso = np.linalg.inv(jacobiano)
 
-    delta_x = jacobiano_inverso * delta_pot
+    variacao_fase_e_tensao = np.dot(jacobiano_inverso, delta_pot)
 
-    print(delta_x)
-    break
+    atualizar_fase_e_tensao(variacao_fase_e_tensao)
+
+print(tensao)
+print(fase)
