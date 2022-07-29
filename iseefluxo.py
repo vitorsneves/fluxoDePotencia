@@ -1,6 +1,7 @@
 from functools import reduce
 import numpy as np
 import math
+import cmath
 
 
 def obter_matriz_nula(linhas, colunas):
@@ -11,40 +12,91 @@ def obter_matriz_nula(linhas, colunas):
 
 ## Parametros gerais
 
-tolerancia = 0.00000001
+tolerancia = 0.01
+potencia_complexa_base_MVA = 100
+tensoes_base_kV = [16.5, 18, 13.8, *([230] * 6)]
 
 ## Dados das barras
 
 ### Quantidade
-total_barras = 4
-barras_PV = 1
-barras_PQ = 2
+total_barras = 9
+barras_PV = 2
+barras_PQ = 6
 
 ### Tensões e fases iniciais supostas
-tensao = [1, 1.05, 1, 1]
+tensao = [1.04, 1.025, 1.025, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
 fase = [0] * (total_barras)
 
-potencias_esperadas = [0.6, -0.5, -0.6, -0.2, -0.1]
+potencias_esperadas = [
+    1.63,
+    0.85,
+    0.00,
+    -1.25,
+    -0.90,
+    0.00,
+    -1.00,
+    0.00,
+    0.00,
+    -0.50,
+    -0.30,
+    0.00,
+    -0.35,
+    0.00,
+]
 
 
 ## Dados de linhas e transformadores
 impedancia_serie = obter_matriz_nula(total_barras, total_barras)
 admitancia_shunt = obter_matriz_nula(total_barras, total_barras)
 
-impedancia_serie[1][0] = 1 / (0.5 - 5j)
-impedancia_serie[0][1] = 1 / (0.5 - 5j)
+### Entre 0 e 3
+impedancia_serie[0][3] = 0 + 0.0576j
+impedancia_serie[3][0] = 0 + 0.0576j
 
-impedancia_serie[1][2] = 1 / (0.5 - 5j)
-impedancia_serie[2][1] = 1 / (0.5 - 5j)
+### Entre 1 e 6
+impedancia_serie[1][6] = 0 + 0.0625j
+impedancia_serie[6][1] = 0 + 0.0625j
 
-impedancia_serie[1][3] = 1 / (1 - 3j)
-impedancia_serie[3][1] = 1 / (1 - 3j)
+### Entre 2 e 8
+impedancia_serie[2][8] = 0 + 0.0586j
+impedancia_serie[8][2] = 0 + 0.0586j
 
-impedancia_serie[2][3] = 1 / (1 - 3j)
-impedancia_serie[3][2] = 1 / (1 - 3j)
+### Entre 3 e 4
+impedancia_serie[3][4] = 0.0100 + 0.0850j
+impedancia_serie[4][3] = 0.0100 + 0.0850j
+admitancia_shunt[3][4] = 0.0176j
+admitancia_shunt[4][3] = 0.0176j
 
-impedancia_serie[3][0] = 1 / (0.2 - 3j)
-impedancia_serie[0][3] = 1 / (0.2 - 3j)
+### Entre 3 e 5
+impedancia_serie[3][5] = 0.0170 + 0.0920j
+impedancia_serie[5][3] = 0.0170 + 0.0920j
+admitancia_shunt[3][5] = 0.1580j
+admitancia_shunt[5][3] = 0.1580j
+
+### Entre 4 e 6
+impedancia_serie[4][6] = 0.0320 + 0.1610j
+impedancia_serie[6][4] = 0.0320 + 0.1610j
+admitancia_shunt[4][6] = 0.3060j
+admitancia_shunt[6][4] = 0.3060j
+
+### Entre 5 e 8
+impedancia_serie[5][8] = 0.0390 + 0.1700j
+impedancia_serie[8][5] = 0.0390 + 0.1700j
+admitancia_shunt[5][8] = 0.3580j
+admitancia_shunt[8][5] = 0.3580j
+
+### Entre 6 e 7
+impedancia_serie[6][7] = 0.0085 + 0.0720j
+impedancia_serie[7][6] = 0.0085 + 0.0720j
+admitancia_shunt[6][7] = 0.1490j
+admitancia_shunt[7][6] = 0.1490j
+
+### Entre 7 e 8
+impedancia_serie[7][8] = 0.0119 + 0.1010j
+impedancia_serie[8][7] = 0.0119 + 0.1010j
+admitancia_shunt[7][8] = 0.2090j
+admitancia_shunt[8][7] = 0.2090j
+
 
 # Fim dos dados do problema
 
@@ -298,12 +350,17 @@ def subtrair_vetores(vetor1, vetor2):
 
 
 def resultado_esta_bom(delta_pot):
+    esta_bom = True
+    erro_maximo = 0
 
     for i in range(len(delta_pot)):
-        if abs(delta_pot[i]) > tolerancia:
-            return False
+        if abs(delta_pot[i]) > erro_maximo:
+            erro_maximo = abs(delta_pot[i])
 
-    return True
+        if abs(delta_pot[i]) > tolerancia:
+            esta_bom = False
+
+    return esta_bom, erro_maximo
 
 
 def atualizar_fase_e_tensao(variacao_fase_e_tensao):
@@ -325,6 +382,7 @@ def atualizar_fase_e_tensao(variacao_fase_e_tensao):
 
 
 quantidade_iteracoes = 0
+historico_erros_maximos = []
 
 # Laço de repetição responsável por calcular os valores de tensão nodal
 # As fases também são calculadas
@@ -332,18 +390,137 @@ while True:
     potencias_calculadas = obter_potencias_calculadas()
     delta_pot = subtrair_vetores(potencias_esperadas, potencias_calculadas)
 
-    if resultado_esta_bom(delta_pot):
+    esta_bom, erro_maximo = resultado_esta_bom(delta_pot)
+
+    historico_erros_maximos.append(erro_maximo)
+    if esta_bom:
         break
 
     quantidade_iteracoes += 1
 
     jacobiano = np.array(calcular_jacobiano())
-
     jacobiano_inverso = np.linalg.inv(jacobiano)
 
     variacao_fase_e_tensao = np.dot(jacobiano_inverso, delta_pot)
-
     atualizar_fase_e_tensao(variacao_fase_e_tensao)
 
-print(tensao)
-print(fase)
+
+def calcular_fluxo_potencia(barra_1, barra_2):
+    tensao_1 = cmath.rect(tensao[barra_1], fase[barra_1])
+    tensao_2 = cmath.rect(tensao[barra_2], fase[barra_2])
+
+    corrente_12 = (tensao_1 - tensao_2) * (-1 * matriz_admitancia[barra_1][barra_2])
+
+    fluxo_potencia_12 = np.conjugate(corrente_12) * tensao_1
+
+    return fluxo_potencia_12
+
+
+def calcular_todos_fluxos_potencia_MVA():
+    todos_fluxos_potencia = obter_matriz_nula(total_barras, total_barras)
+
+    for i in range(total_barras):
+        for j in range(total_barras):
+            todos_fluxos_potencia[i][j] = (
+                calcular_fluxo_potencia(i, j) * potencia_complexa_base_MVA
+            )
+
+    return todos_fluxos_potencia
+
+
+def calcular_perdas_MVA(todos_fluxos_potencia):
+    perdas_MVA = 0 + 0j
+
+    for i in range(total_barras):
+        for j in range(total_barras):
+            perdas_MVA += todos_fluxos_potencia[i][j]
+
+    return perdas_MVA
+
+
+todos_fluxos_potencia = calcular_todos_fluxos_potencia_MVA()
+perdas_MVA = calcular_perdas_MVA(todos_fluxos_potencia)
+
+
+# Daqui em diante está as funções responsáveis por
+# exibir os dados na tela
+
+
+def exibe_quantidade_iteracoes():
+    print(f"\ntolerância = {tolerancia}")
+
+    for i in range(len(historico_erros_maximos)):
+        print(f"Iteração {i} => erro máximo = {'%.4f' % historico_erros_maximos[i]}")
+
+    print(f"\nQuantidade total de iterações: {quantidade_iteracoes}\n")
+
+
+def padding_numero(numero):
+    if numero >= 0:
+        return " %.4f" % numero
+    else:
+        return "%.4f" % numero
+
+
+def exibe_tensoes_nodais():
+    def tensao_pu(numero_barra):
+        return padding_numero(tensao[numero_barra])
+
+    def angulo_rad(numero_barra):
+        return padding_numero(fase[numero_barra])
+
+    def tensao_kV(numero_barra):
+        return padding_numero(tensao[numero_barra] * tensoes_base_kV[numero_barra])
+
+    def angulo_graus(numero_barra):
+        angulo = fase[numero_barra] * (180 / math.pi)
+        return padding_numero(angulo)
+
+    print("\n#######################  Tensões Nodais  #######################")
+    print("################################################################")
+    print("    Barra     V[pu]      Fase[rad]     V[kV]     Fase[grau]    ")
+    for i in range(len(tensao)):
+        print(
+            f"      {i + 1}     {tensao_pu(i)}      {angulo_rad(i)}    { tensao_kV(i)}      {angulo_graus(i)}"
+        )
+    print("################################################################\n")
+
+
+def exibe_fluxo_potencia():
+    def imprime_linha_tabela(barra_1, barra_2):
+        pot_complexa = todos_fluxos_potencia[barra_1][barra_2]
+
+        pot_ativa = padding_numero(pot_complexa.real)
+        pot_reativa = padding_numero(pot_complexa.imag)
+
+        print(
+            f"      {barra_1 + 1}  ---->  {barra_2 + 1}          {pot_ativa}           {pot_reativa}"
+        )
+
+    print("\n#####################  Fluxos de Potência  #####################")
+    print("################################################################")
+    print("    From       To            P[MW]             Q[MVAr]       ")
+    for i in range(total_barras):
+        for j in range(i + 1, total_barras):
+            if todos_fluxos_potencia[i][j] != 0:
+                imprime_linha_tabela(i, j)
+                imprime_linha_tabela(j, i)
+    print("################################################################\n")
+
+
+def exibe_perdas_totais():
+    print(f"\nPerdas de potência ativa totais [MW]: {padding_numero(perdas_MVA.real)}")
+    print(
+        f"\nPerdas de potência reativa totais [MVAr]: {padding_numero(perdas_MVA.imag)}\n"
+    )
+
+
+print("----------------------------------------------------------------")
+exibe_quantidade_iteracoes()
+print("----------------------------------------------------------------")
+exibe_tensoes_nodais()
+print("----------------------------------------------------------------")
+exibe_fluxo_potencia()
+print("----------------------------------------------------------------")
+exibe_perdas_totais()
+print("----------------------------------------------------------------")
