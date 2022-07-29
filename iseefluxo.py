@@ -11,89 +11,40 @@ def obter_matriz_nula(linhas, colunas):
 
 ## Parametros gerais
 
-tolerancia = 0.001
+tolerancia = 0.00000001
 
 ## Dados das barras
 
 ### Quantidade
-total_barras = 9
-barras_PV = 2
-barras_PQ = 6
+total_barras = 4
+barras_PV = 1
+barras_PQ = 2
 
 ### Tensões e fases iniciais supostas
-tensao = [1.04, 1.025, 1.025, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00]
+tensao = [1, 1.05, 1, 1]
 fase = [0] * (total_barras)
 
-potencias_esperadas = [
-    1.63,
-    0.85,
-    0.00,
-    -1.25,
-    -0.90,
-    0.00,
-    -1.00,
-    0.00,
-    0.00,
-    -0.50,
-    -0.30,
-    0.00,
-    -0.35,
-    0.00,
-]
+potencias_esperadas = [0.6, -0.5, -0.6, -0.2, -0.1]
 
 
 ## Dados de linhas e transformadores
 impedancia_serie = obter_matriz_nula(total_barras, total_barras)
 admitancia_shunt = obter_matriz_nula(total_barras, total_barras)
 
-### Entre 0 e 3
-impedancia_serie[0][3] = 0 + 0.0576j
-impedancia_serie[3][0] = 0 + 0.0576j
+impedancia_serie[1][0] = 1 / (0.5 - 5j)
+impedancia_serie[0][1] = 1 / (0.5 - 5j)
 
-### Entre 1 e 6
-impedancia_serie[1][6] = 0 + 0.0625j
-impedancia_serie[6][1] = 0 + 0.0625j
+impedancia_serie[1][2] = 1 / (0.5 - 5j)
+impedancia_serie[2][1] = 1 / (0.5 - 5j)
 
-### Entre 2 e 8
-impedancia_serie[2][8] = 0 + 0.0586j
-impedancia_serie[8][2] = 0 + 0.0586j
+impedancia_serie[1][3] = 1 / (1 - 3j)
+impedancia_serie[3][1] = 1 / (1 - 3j)
 
-### Entre 3 e 4
-impedancia_serie[3][4] = 0.0100 + 0.0850j
-impedancia_serie[4][3] = 0.0100 + 0.0850j
-admitancia_shunt[3][4] = 0.0176j
-admitancia_shunt[4][3] = 0.0176j
+impedancia_serie[2][3] = 1 / (1 - 3j)
+impedancia_serie[3][2] = 1 / (1 - 3j)
 
-### Entre 3 e 5
-impedancia_serie[3][5] = 0.0170 + 0.0920j
-impedancia_serie[5][3] = 0.0170 + 0.0920j
-admitancia_shunt[3][5] = 0.1580j
-admitancia_shunt[5][3] = 0.1580j
-
-### Entre 4 e 6
-impedancia_serie[4][6] = 0.0320 + 0.1610j
-impedancia_serie[6][4] = 0.0320 + 0.1610j
-admitancia_shunt[4][6] = 0.3060j
-admitancia_shunt[6][4] = 0.3060j
-
-### Entre 5 e 8
-impedancia_serie[5][8] = 0.0390 + 0.1700j
-impedancia_serie[8][5] = 0.0390 + 0.1700j
-admitancia_shunt[5][8] = 0.3580j
-admitancia_shunt[8][5] = 0.3580j
-
-### Entre 6 e 7
-impedancia_serie[6][7] = 0.0085 + 0.0720j
-impedancia_serie[7][6] = 0.0085 + 0.0720j
-admitancia_shunt[6][7] = 0.1490j
-admitancia_shunt[7][6] = 0.1490j
-
-### Entre 7 e 8
-impedancia_serie[7][8] = 0.0119 + 0.1010j
-impedancia_serie[8][7] = 0.0119 + 0.1010j
-admitancia_shunt[7][8] = 0.2090j
-admitancia_shunt[8][7] = 0.2090j
-
+impedancia_serie[3][0] = 1 / (0.2 - 3j)
+impedancia_serie[0][3] = 1 / (0.2 - 3j)
 
 # Fim dos dados do problema
 
@@ -171,8 +122,11 @@ def calcular_potencia_reativa(num_barra):
 def calcular_submatriz_h():
     submatriz_h = obter_matriz_nula(total_barras - 1, total_barras - 1)
 
-    for i in range(len(submatriz_h)):
-        for j in range(len(submatriz_h[0])):
+    i_inicial = 1
+    j_inicial = 1
+
+    for i in range(1, total_barras):
+        for j in range(1, total_barras):
 
             condutancia = matriz_admitancia[i][j].real
             susceptancia = matriz_admitancia[i][j].imag
@@ -180,7 +134,7 @@ def calcular_submatriz_h():
 
             if i != j:
 
-                submatriz_h[i][j] = (
+                submatriz_h[i - i_inicial][j - j_inicial] = (
                     -1
                     * tensao[i]
                     * tensao[j]
@@ -189,7 +143,7 @@ def calcular_submatriz_h():
                 continue
 
             if i == j:
-                submatriz_h[i][j] = (
+                submatriz_h[i - i_inicial][j - j_inicial] = (
                     -1 * calcular_potencia_reativa(i) - (tensao[i] ** 2) * susceptancia
                 )
 
@@ -199,15 +153,18 @@ def calcular_submatriz_h():
 def calcular_submatriz_n():
     submatriz_n = obter_matriz_nula(total_barras - 1, barras_PQ)
 
-    for i in range(len(submatriz_n)):
-        for j in range(len(submatriz_n[0])):
+    i_inicial = 1
+    j_inicial = 1 + barras_PV
+
+    for i in range(i_inicial, total_barras):
+        for j in range(j_inicial, total_barras):
 
             condutancia = matriz_admitancia[i][j].real
             susceptancia = matriz_admitancia[i][j].imag
             teta = fase[j] - fase[i]
 
             if i != j:
-                submatriz_n[i][j] = (
+                submatriz_n[i - i_inicial][j - j_inicial] = (
                     tensao[i]
                     * tensao[j]
                     * (condutancia * math.cos(teta) - susceptancia * math.sin(teta))
@@ -215,7 +172,7 @@ def calcular_submatriz_n():
                 continue
 
             if i == j:
-                submatriz_n[i][j] = (
+                submatriz_n[i - i_inicial][j - j_inicial] = (
                     calcular_potencia_ativa(i) + (tensao[i] ** 2) * condutancia
                 )
 
@@ -225,25 +182,28 @@ def calcular_submatriz_n():
 def calcular_submatriz_j():
     submatriz_j = obter_matriz_nula(barras_PQ, total_barras - 1)
 
-    for i in range(len(submatriz_j)):
-        for j in range(len(submatriz_j[0])):
+    i_inicial = 1 + barras_PV
+    j_inicial = 1
+
+    for i in range(i_inicial, total_barras):
+        for j in range(1, total_barras):
 
             condutancia = matriz_admitancia[i][j].real
             susceptancia = matriz_admitancia[i][j].imag
             teta = fase[j] - fase[i]
 
-        if i != j:
-            submatriz_j[i][j] = (
-                tensao[i]
-                * tensao[j]
-                * (susceptancia * math.sin(teta) - condutancia * math.cos(teta))
-            )
-            continue
+            if i != j:
+                submatriz_j[i - i_inicial][j - j_inicial] = (
+                    tensao[i]
+                    * tensao[j]
+                    * (susceptancia * math.sin(teta) - condutancia * math.cos(teta))
+                )
+                continue
 
-        if i == j:
-            submatriz_j[i][j] = (
-                calcular_potencia_ativa(i) - (tensao[i] ** 2) * condutancia
-            )
+            if i == j:
+                submatriz_j[i - i_inicial][j - j_inicial] = (
+                    calcular_potencia_ativa(i) - (tensao[i] ** 2) * condutancia
+                )
 
     return submatriz_j
 
@@ -251,15 +211,18 @@ def calcular_submatriz_j():
 def calcular_submatriz_l():
     submatriz_l = obter_matriz_nula(barras_PQ, barras_PQ)
 
-    for i in range(len(submatriz_l)):
-        for j in range(len(submatriz_l[0])):
+    i_inicial = 1 + barras_PV
+    j_inicial = 1 + barras_PV
+
+    for i in range(i_inicial, total_barras):
+        for j in range(j_inicial, total_barras):
 
             condutancia = matriz_admitancia[i][j].real
             susceptancia = matriz_admitancia[i][j].imag
             teta = fase[j] - fase[i]
 
             if i != j:
-                submatriz_l[i][j] = (
+                submatriz_l[i - i_inicial][j - j_inicial] = (
                     -1
                     * tensao[i]
                     * tensao[j]
@@ -268,7 +231,7 @@ def calcular_submatriz_l():
                 continue
 
             if i == j:
-                submatriz_l[i][j] = (
+                submatriz_l[i - i_inicial][j - j_inicial] = (
                     calcular_potencia_reativa(i) - (tensao[i] ** 2) * susceptancia
                 )
 
@@ -335,41 +298,44 @@ def subtrair_vetores(vetor1, vetor2):
 
 
 def resultado_esta_bom(delta_pot):
-    resultado_bom = True
 
     for i in range(len(delta_pot)):
-        if delta_pot[i] > tolerancia:
-            resultado_bom = False
-            break
+        if abs(delta_pot[i]) > tolerancia:
+            return False
 
-    return resultado_bom
+    return True
 
 
 def atualizar_fase_e_tensao(variacao_fase_e_tensao):
 
     # Atualização da fase
-    for i in range(total_barras - 1):
-        fase[i] += variacao_fase_e_tensao[i]
+    # Pula a barra slack
+    for i in range(1, total_barras):
+        fase[i] += variacao_fase_e_tensao[i - 1]
 
     # Atualização tensão
     # Começa na primeira tensão de barra PQ
     # Pula a slack e as barras PV
     posicao_tensao = barras_PV + 1
 
-    for i in range(total_barras, len(variacao_fase_e_tensao)):
-        tensao[posicao_tensao] = (-1 * tensao[posicao_tensao]) / (
-            variacao_fase_e_tensao[i] - 1
-        )
+    for i in range(total_barras, len(variacao_fase_e_tensao) + 1):
 
+        tensao[posicao_tensao] += variacao_fase_e_tensao[i - 1]
         posicao_tensao += 1
 
 
+quantidade_iteracoes = 0
+
+# Laço de repetição responsável por calcular os valores de tensão nodal
+# As fases também são calculadas
 while True:
     potencias_calculadas = obter_potencias_calculadas()
     delta_pot = subtrair_vetores(potencias_esperadas, potencias_calculadas)
 
     if resultado_esta_bom(delta_pot):
         break
+
+    quantidade_iteracoes += 1
 
     jacobiano = np.array(calcular_jacobiano())
 
