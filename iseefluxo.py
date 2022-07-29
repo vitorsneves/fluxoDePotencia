@@ -1,4 +1,5 @@
 from functools import reduce
+import numpy as np
 import math
 
 # Funções auxiliares
@@ -17,6 +18,7 @@ def soma(a, b):
 total_barras = 9
 barras_PV = 2
 barras_PQ = 6
+tolerancia = 0.001
 
 ## Dados de linhas e transformadores
 impedancia_serie = obter_matriz_nula(total_barras, total_barras)
@@ -276,4 +278,74 @@ def calcular_jacobiano():
     return jacobiano
 
 
-print(calcular_jacobiano())
+def obter_potencias_calculadas():
+    potencias_calculadas = [0] * (barras_PQ * 2 + barras_PV)
+    posicao_atual = 0
+
+    # Cálculo de potências ativas
+    # A barra slack foi desconsiderada
+    for i in range(1, total_barras):
+        potencias_calculadas[posicao_atual] = calcular_potencia_ativa(i)
+        posicao_atual += 1
+
+    # Cálculo de potências reativas
+    # A barra slack e as barras pv foram desconsideradas
+    for i in range(3, total_barras):
+        potencias_calculadas[posicao_atual] = calcular_potencia_reativa(i)
+        posicao_atual += 1
+
+    return potencias_calculadas
+
+
+def subtrair_vetores(vetor1, vetor2):
+    resultado = [0] * len(vetor1)
+
+    for i in range(len(resultado)):
+        resultado[i] = vetor1[i] - vetor2[i]
+
+    return resultado
+
+
+def resultado_esta_bom(delta_pot):
+    resultado_bom = True
+
+    for i in range(len(delta_pot)):
+        if delta_pot[i] > tolerancia:
+            resultado_bom = False
+            break
+
+    return resultado_bom
+
+
+potencias_esperadas = [
+    1.63,
+    0.85,
+    0.00,
+    -1.25,
+    -0.90,
+    0.00,
+    -1.00,
+    0.00,
+    0.00,
+    -0.50,
+    -0.30,
+    0.00,
+    -0.35,
+    0.00,
+]
+
+while True:
+    potencias_calculadas = obter_potencias_calculadas()
+    delta_pot = subtrair_vetores(potencias_esperadas, potencias_calculadas)
+
+    if resultado_esta_bom(delta_pot):
+        break
+
+    jacobiano = np.array(calcular_jacobiano())
+
+    jacobiano_inverso = np.linalg.inv(jacobiano)
+
+    delta_x = jacobiano_inverso * delta_pot
+
+    print(delta_x)
+    break
