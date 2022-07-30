@@ -381,7 +381,9 @@ def atualizar_fase_e_tensao(variacao_fase_e_tensao):
 
     for i in range(total_barras, len(variacao_fase_e_tensao) + 1):
 
-        tensao[posicao_tensao] += variacao_fase_e_tensao[i - 1]
+        tensao[posicao_tensao] = (-1 * tensao[posicao_tensao]) / (
+            variacao_fase_e_tensao[i - 1] - 1
+        )
         posicao_tensao += 1
 
 
